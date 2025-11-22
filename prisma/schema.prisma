@@ -32,7 +32,11 @@ model User {
   updatedAt     DateTime  @updatedAt
 }
 
-enum UserRole { ADMIN VENDOR CUSTOMER }
+enum UserRole {
+  ADMIN
+  VENDOR
+  CUSTOMER
+}
 
 model Account {
   id                String  @id @default(cuid())
@@ -88,7 +92,12 @@ model Vendor {
   updatedAt      DateTime  @updatedAt
 }
 
-enum KycStatus { PENDING SUBMITTED APPROVED REJECTED }
+enum KycStatus {
+  PENDING
+  SUBMITTED
+  APPROVED
+  REJECTED
+}
 
 model PayoutAccount {
   id          String  @id @default(cuid())
@@ -112,7 +121,12 @@ model Payout {
   createdAt DateTime     @default(now())
 }
 
-enum PayoutStatus { PENDING PROCESSING COMPLETED FAILED }
+enum PayoutStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
 
 // ==================== PRODUCTS ====================
 model Category {
@@ -169,7 +183,13 @@ model Product {
   @@index([status])
 }
 
-enum ProductStatus { DRAFT PENDING PUBLISHED REJECTED ARCHIVED }
+enum ProductStatus {
+  DRAFT
+  PENDING
+  PUBLISHED
+  REJECTED
+  ARCHIVED
+}
 
 model ProductFile {
   id        String  @id @default(cuid())
@@ -226,7 +246,14 @@ model Order {
   @@index([status])
 }
 
-enum OrderStatus { PENDING PROCESSING PAID FULFILLED REFUNDED CANCELLED }
+enum OrderStatus {
+  PENDING
+  PROCESSING
+  PAID
+  FULFILLED
+  REFUNDED
+  CANCELLED
+}
 
 model OrderItem {
   id          String  @id @default(cuid())
@@ -302,7 +329,10 @@ model Coupon {
   createdAt   DateTime   @default(now())
 }
 
-enum CouponType { PERCENTAGE FIXED }
+enum CouponType {
+  PERCENTAGE
+  FIXED
+}
 
 // ==================== BLOG ====================
 model BlogPost {

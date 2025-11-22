@@ -4,11 +4,28 @@
 import { useRef } from 'react';
 import { Button } from './Button';
 
-function Dialog({ children, ...props }: { children: React.ReactNode }) {
+function Dialog({
+  children,
+  open,
+  ...props
+}: {
+  children: React.ReactNode;
+  open: boolean;
+  [key: string]: any;
+}) {
+  if (!open) {
+    return null;
+  }
   return <div {...props}>{children}</div>;
 }
 
-function DialogTitle({ children, ...props }: { children: React.ReactNode }) {
+function DialogTitle({
+  children,
+  ...props
+}: {
+  children: React.ReactNode;
+  [key: string]: any;
+}) {
   return <h2 {...props}>{children}</h2>;
 }
 
