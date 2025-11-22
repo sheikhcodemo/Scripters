@@ -1,0 +1,329 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL_UNPOOLED")
+}
+
+// ==================== AUTH ====================
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  hashedPass    String?
+  image         String?
+  role          UserRole  @default(CUSTOMER)
+  emailVerified DateTime?
+  resetToken    String?
+  resetExpires  DateTime?
+
+  vendor        Vendor?
+  orders        Order[]
+  reviews       Review[]
+  cart          CartItem[]
+  downloads     Download[]
+  sessions      Session[]
+  accounts      Account[]
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+enum UserRole { ADMIN VENDOR CUSTOMER }
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+  @@unique([identifier, token])
+}
+
+// ==================== VENDOR ====================
+model Vendor {
+  id             String    @id @default(cuid())
+  userId         String    @unique
+  user           User      @relation(fields: [userId], references: [id])
+  storeName      String
+  slug           String    @unique
+  description    String?   @db.Text
+  logo           String?
+  banner         String?
+  verified       Boolean   @default(false)
+  kycStatus      KycStatus @default(PENDING)
+  commissionRate Float     @default(0.15)
+
+  products       Product[]
+  payoutAccount  PayoutAccount?
+  payouts        Payout[]
+
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+enum KycStatus { PENDING SUBMITTED APPROVED REJECTED }
+
+model PayoutAccount {
+  id          String  @id @default(cuid())
+  vendorId    String  @unique
+  vendor      Vendor  @relation(fields: [vendorId], references: [id])
+  provider    String  // stripe, atlos, bank
+  accountId   String?
+  accountData Json?
+  verified    Boolean @default(false)
+}
+
+model Payout {
+  id        String       @id @default(cuid())
+  vendorId  String
+  vendor    Vendor       @relation(fields: [vendorId], references: [id])
+  amount    Float
+  currency  String       @default("USD")
+  status    PayoutStatus @default(PENDING)
+  reference String?
+  paidAt    DateTime?
+  createdAt DateTime     @default(now())
+}
+
+enum PayoutStatus { PENDING PROCESSING COMPLETED FAILED }
+
+// ==================== PRODUCTS ====================
+model Category {
+  id          String     @id @default(cuid())
+  name        String
+  slug        String     @unique
+  description String?
+  icon        String?
+  parentId    String?
+  parent      Category?  @relation("SubCategories", fields: [parentId], references: [id])
+  children    Category[] @relation("SubCategories")
+  products    Product[]
+  createdAt   DateTime   @default(now())
+}
+
+model Product {
+  id           String        @id @default(cuid())
+  vendorId     String
+  vendor       Vendor        @relation(fields: [vendorId], references: [id])
+  categoryId   String?
+  category     Category?     @relation(fields: [categoryId], references: [id])
+
+  title        String
+  slug         String        @unique
+  description  String        @db.Text
+  shortDesc    String?
+  price        Float
+  comparePrice Float?
+
+  thumbnail    String
+  images       String[]
+  demoUrl      String?
+  videoUrl     String?
+
+  files        ProductFile[]
+  licenses     License[]
+  tags         String[]
+
+  featured     Boolean       @default(false)
+  status       ProductStatus @default(DRAFT)
+  salesCount   Int           @default(0)
+  viewCount    Int           @default(0)
+  avgRating    Float         @default(0)
+
+  orderItems   OrderItem[]
+  reviews      Review[]
+  cartItems    CartItem[]
+
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([vendorId])
+  @@index([categoryId])
+  @@index([status])
+}
+
+enum ProductStatus { DRAFT PENDING PUBLISHED REJECTED ARCHIVED }
+
+model ProductFile {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name      String
+  key       String  // S3 key
+  size      Int
+  checksum  String
+  version   String  @default("1.0.0")
+}
+
+model License {
+  id          String   @id @default(cuid())
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  type        String   // personal, commercial, extended
+  name        String
+  price       Float
+  features    String[]
+  maxProjects Int?
+  support     Boolean  @default(false)
+  updates     String?  // 6mo, 1yr, lifetime
+}
+
+// ==================== ORDERS ====================
+model Order {
+  id            String      @id @default(cuid())
+  orderNumber   String      @unique
+  userId        String
+  user          User        @relation(fields: [userId], references: [id])
+
+  items         OrderItem[]
+  downloads     Download[]
+
+  subtotal      Float
+  discount      Float       @default(0)
+  platformFee   Float
+  total         Float
+  currency      String      @default("USD")
+
+  status        OrderStatus @default(PENDING)
+  paymentMethod String?     // stripe, atlos
+  paymentId     String?
+  paidAt        DateTime?
+
+  couponId      String?
+  coupon        Coupon?     @relation(fields: [couponId], references: [id])
+
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+enum OrderStatus { PENDING PROCESSING PAID FULFILLED REFUNDED CANCELLED }
+
+model OrderItem {
+  id          String  @id @default(cuid())
+  orderId     String
+  order       Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product @relation(fields: [productId], references: [id])
+  vendorId    String
+  licenseType String
+  price       Float
+  licenseKey  String?
+}
+
+model Download {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id])
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  productId String
+  fileKey   String
+  count     Int      @default(0)
+  maxCount  Int      @default(5)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+// ==================== CART ====================
+model CartItem {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+  licenseType String   @default("personal")
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, productId])
+}
+
+// ==================== REVIEWS ====================
+model Review {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  rating    Int
+  title     String?
+  comment   String?  @db.Text
+  verified  Boolean  @default(false)
+  helpful   Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, productId])
+}
+
+// ==================== COUPONS ====================
+model Coupon {
+  id          String     @id @default(cuid())
+  code        String     @unique
+  type        CouponType
+  value       Float
+  minPurchase Float?
+  maxDiscount Float?
+  usageLimit  Int?
+  usedCount   Int        @default(0)
+  startDate   DateTime?
+  endDate     DateTime?
+  active      Boolean    @default(true)
+  orders      Order[]
+  createdAt   DateTime   @default(now())
+}
+
+enum CouponType { PERCENTAGE FIXED }
+
+// ==================== BLOG ====================
+model BlogPost {
+  id          String    @id @default(cuid())
+  title       String
+  slug        String    @unique
+  excerpt     String?
+  content     String    @db.Text
+  thumbnail   String?
+  authorId    String
+  published   Boolean   @default(false)
+  publishedAt DateTime?
+  tags        String[]
+  viewCount   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+// ==================== SETTINGS ====================
+model Setting {
+  id    String @id @default(cuid())
+  key   String @unique
+  value Json
+}
